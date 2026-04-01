@@ -18,6 +18,7 @@
 #include <math.h>
 #include "pameval.h"
 #include "Score.h"
+#include "ThreadPool.h"
 
 using namespace std;
 

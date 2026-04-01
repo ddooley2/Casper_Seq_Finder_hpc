@@ -30,8 +30,6 @@ CrisprGroup::~CrisprGroup()
 void CrisprGroup::findPAMs(bool dir, bool mt, vector<string> &sequences, vector<unsigned long> &compressed_seeds, vector<long> &seed_locs, vector<int> &ot_scores, vector<int> &cnts, bool &strand, pameval &PamEval, int &pam_length, int &seq_length, int &five_length, int &seed_length, string &score_file, string &on_target_data, string &endo, bool &directionality, string &pam)
 {
 	Scoring score(score_file, on_target_data, directionality, endo, seq_length, pam);
-	int threads = sequences.size();
-	vector<thread> running_threads(threads);
 	vector<vector<long> > locs(sequences.size());
 	vector<vector<unsigned long> > comp_seeds(sequences.size());
 	vector<vector<int> > on_target_scores(sequences.size());
@@ -39,22 +37,31 @@ void CrisprGroup::findPAMs(bool dir, bool mt, vector<string> &sequences, vector<
 
 	if (dir == true) //if considering directionality
 	{
-		if (mt) //if using multi-threading, spawn all threads then join
+		if (mt) //if using multi-threading, use thread pool
 		{
-			for (int k = 0; k < threads; k++)
+			size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), sequences.size());
+			if (num_threads == 0) num_threads = 4;
+			ThreadPool pool(num_threads);
+			std::vector<std::future<void>> futures;
+			futures.reserve(sequences.size());
+			
+			for (size_t k = 0; k < sequences.size(); k++)
 			{
-				thread t([this, &locs, &cnts, &comp_seeds, &on_target_scores, &sequences, &PamEval, k, &pam_length, &seq_length, &five_length, &seed_length, &score]() {find_seeds_dir(locs[k], cnts[k], comp_seeds[k], on_target_scores[k], sequences[k], PamEval, k, pam_length, seq_length, five_length, seed_length, score); });
-				running_threads[k] = move(t);
+				futures.push_back(pool.enqueue([this, &locs, &cnts, &comp_seeds, &on_target_scores, &sequences, &PamEval, k, &pam_length, &seq_length, &five_length, &seed_length, &score]() {
+					find_seeds_dir(locs[k], cnts[k], comp_seeds[k], on_target_scores[k], sequences[k], PamEval, k, pam_length, seq_length, five_length, seed_length, score);
+				}));
 			}
-			for (int j = 0; j < running_threads.size(); j++)
+			for (size_t j = 0; j < futures.size(); j++)
 			{
-				running_threads[j].join();
-				cout << "Chromosome " << j + 1 << " complete." << endl;
+				futures[j].get();
+				if ((j + 1) % 10000 == 0 || j == futures.size() - 1) {
+					cout << "Processed " << (j + 1) << " / " << futures.size() << " sequences" << endl;
+				}
 			}
 		}
 		else //if using single-threading, go one at a time
 		{
-			for (int k = 0; k < threads; k++)
+			for (size_t k = 0; k < sequences.size(); k++)
 			{
 				find_seeds_dir(locs[k], cnts[k], comp_seeds[k], on_target_scores[k], sequences[k], PamEval, k, pam_length, seq_length, five_length, seed_length, score);
 				cout << "Chromosome " << k + 1 << " complete." << endl;
@@ -65,20 +72,29 @@ void CrisprGroup::findPAMs(bool dir, bool mt, vector<string> &sequences, vector<
 	{
 		if (mt)
 		{
-			for (int k = 0; k < threads; k++)
+			size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), sequences.size());
+			if (num_threads == 0) num_threads = 4;
+			ThreadPool pool(num_threads);
+			std::vector<std::future<void>> futures;
+			futures.reserve(sequences.size());
+			
+			for (size_t k = 0; k < sequences.size(); k++)
 			{
-				thread t([this, &locs, &cnts, &comp_seeds, &on_target_scores, &sequences, &PamEval, k, &seq_length, &five_length, &seed_length, &score]() {find_seeds(locs[k], cnts[k], comp_seeds[k], on_target_scores[k], sequences[k], PamEval, k, seq_length, five_length, seed_length, score); });
-				running_threads[k] = move(t);
+				futures.push_back(pool.enqueue([this, &locs, &cnts, &comp_seeds, &on_target_scores, &sequences, &PamEval, k, &seq_length, &five_length, &seed_length, &score]() {
+					find_seeds(locs[k], cnts[k], comp_seeds[k], on_target_scores[k], sequences[k], PamEval, k, seq_length, five_length, seed_length, score);
+				}));
 			}
-			for (int j = 0; j < running_threads.size(); j++)
+			for (size_t j = 0; j < futures.size(); j++)
 			{
-				running_threads[j].join();
-				cout << "Chromosome " << j + 1 << " complete." << endl;
+				futures[j].get();
+				if ((j + 1) % 10000 == 0 || j == futures.size() - 1) {
+					cout << "Processed " << (j + 1) << " / " << futures.size() << " sequences" << endl;
+				}
 			}
 		}
 		else
 		{
-			for (int k = 0; k < threads; k++)
+			for (size_t k = 0; k < sequences.size(); k++)
 			{
 				find_seeds(locs[k], cnts[k], comp_seeds[k], on_target_scores[k], sequences[k], PamEval, k, seq_length, five_length, seed_length, score);
 				cout << "Chromosome " << k + 1 << " complete." << endl;

@@ -88,6 +88,15 @@ int main(int argc, char* argv[])
 	org_name = string(argv[13]);
 	notes = string(argv[14]);
 	on_target_data = string(argv[15]);
+	
+	// Parse optional thread count parameter
+	int num_threads = std::thread::hardware_concurrency();
+	if (argc > 16) {
+		num_threads = stoi(string(argv[16]));
+	}
+	if (num_threads <= 0) num_threads = 4;
+	cout << "Using " << num_threads << " threads." << endl;
+	
 	seq_length = five_length + seed_length + three_length;
 	pam_length = pam.size();
 	total = seq_length + pam_length;
