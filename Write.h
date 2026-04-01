@@ -27,4 +27,5 @@ public:
 	void write_repeats_dir(string &filename, vector<int> &repeats, vector<string> &sequences, vector<long> &seed_locs, vector<unsigned long> &compressed_seeds, vector<int> &on_target_scores, vector<int> &seed_cnts, string &score_file, int &five_length, int &three_length, int &seed_length, int &pam_length, int &seq_length);
 	int convertCharBase4(char &c);
 	string reverseComplement(string &str);
+	int findChromosome(int idx, vector<int> &boundaries);
 };
